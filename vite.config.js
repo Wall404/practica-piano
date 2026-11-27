@@ -31,6 +31,7 @@ const pdfHelper = () => ({
       const url = new URL(req.url, 'http://pc')
       const name = basename(url.searchParams.get('name') ?? 'partitura.pdf').replace(/[^\w.\- ]/g, '_').replace(/(\.pdf)?$/i, '.pdf')
       const paginas = url.searchParams.get('paginas')
+      console.log(`[pdf] ${new Date().toLocaleTimeString()} convirtiendo ${name}${paginas ? ` (páginas ${paginas})` : ''}`)
       // Dentro de la app (no en /tmp): el Audiveris de Flathub solo ve ~/Documentos.
       await mkdir('scores', { recursive: true })
       const dir = await mkdtemp(resolve('scores/.convertir-'))
