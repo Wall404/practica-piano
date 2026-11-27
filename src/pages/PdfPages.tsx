@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-import { importAndSave, rangesFromStarts } from '../import/collection'
+import { failedNotice, importAndSave, rangesFromStarts } from '../import/collection'
 
 const THUMB_PX = 120
 // Lo atiende la app local de la PC (npm run dev, ícono «Práctica Piano»): ver pdfHelper en vite.config.js.
@@ -86,8 +86,11 @@ export default function PdfPages({ file, onBack }: { file: File; onBack: () => v
       )
       // Una sola obra queda suelta, sin el .coleccion.json.
       const works = files.filter((f) => !f.name.endsWith('.json'))
-      await importAndSave(works.length === 1 ? works : files)
-      onBack()
+      const notice = failedNotice((await importAndSave(works.length === 1 ? works : files)).failed)
+      if (!notice) return onBack()
+      setError(`Se agregaron las demás a la biblioteca. ${notice}`)
+      setBusy(false)
+      setPageCount(0) // ya están guardadas: sin esto, otro toque las duplicaría
     } catch (err) {
       setError(err instanceof Error ? err.message : 'La PC no pudo convertir el PDF.')
       setBusy(false)

@@ -55,10 +55,17 @@ export async function importCollection(files: File[]) {
   const stamp = Date.now()
   const collectionId = `${stamp}-${plan.title}`
   const items: { score: Score; file: File }[] = []
-  // Primero se leen todas: si una falla no queda una colección a medias.
+  const failed: string[] = []
+  // Primero se leen todas; las que fallan quedan afuera y se avisa, para no perder las demás.
   for (const obra of plan.obras) {
     const file = works.find((f) => f.name === obra.file)!
-    const score = await importFile(file)
+    let score: Score
+    try {
+      score = await importFile(file)
+    } catch (err) {
+      failed.push(err instanceof Error ? err.message : file.name)
+      continue
+    }
     items.push({
       file,
       score: {
@@ -75,7 +82,8 @@ export async function importCollection(files: File[]) {
     pdfName: plan.pdfName,
     scoreIds: items.map((i) => i.score.id),
   }
-  return { collection, items }
+  if (items.length === 0) throw new Error(`No se pudo leer ninguna obra. ${failed[0] ?? ''}`)
+  return { collection, items, failed }
 }
 
 /** Páginas donde empieza cada obra → rangos para `npm run pdf -- --paginas`. Ej.: [3, 1] en 5 páginas → "1-2,3-5". */
@@ -90,15 +98,19 @@ export function rangesFromStarts(starts: number[], pageCount: number) {
 }
 
 /** Lee y guarda archivos de partitura: uno solo queda suelto, varios forman una colección. */
-export async function importAndSave(files: File[]): Promise<{ score?: Score; collectionId?: string }> {
+export async function importAndSave(files: File[]): Promise<{ score?: Score; collectionId?: string; failed?: string[] }> {
   const keep = (score: Score, file: File) => (score.source.kind === 'musicxml' ? file : undefined)
   if (files.length > 1) {
-    const { collection, items } = await importCollection(files)
+    const { collection, items, failed } = await importCollection(files)
     await saveCollection(collection, items.map(({ score, file }) => ({ score, file: keep(score, file) })))
-    return { collectionId: collection.id }
+    return { collectionId: collection.id, failed }
   }
   const [file] = files
   const score = await importFile(file)
   await saveScore(score, keep(score, file))
   return { score }
 }
+
+/** Aviso para las obras que quedaron afuera de una colección. */
+export const failedNotice = (failed: string[] = []) =>
+  failed.length ? `${failed.length === 1 ? 'Una obra no se pudo leer' : `${failed.length} obras no se pudieron leer`} y quedó afuera: ${failed.join(' · ')}` : null

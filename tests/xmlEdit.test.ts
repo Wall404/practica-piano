@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { countMeasures, mergeXml, splitXml } from '../src/import/xmlEdit'
+import { cleanXml, countMeasures, mergeXml, splitXml } from '../src/import/xmlEdit'
 
 const measure = (n: number, attrs = '') => `<measure number="${n}">${attrs}<note><rest/><duration>4</duration></note></measure>`
 const START = '<attributes><divisions>1</divisions><key><fifths>0</fifths></key><time><beats>4</beats><beat-type>4</beat-type></time><staves>2</staves><clef number="1"><sign>G</sign><line>2</line></clef><clef number="2"><sign>F</sign><line>4</line></clef></attributes>'
@@ -59,5 +59,22 @@ describe('separar obras', () => {
 
   it('rechaza compases fuera de rango', () => {
     for (const bad of [1, 5, 2.5]) expect(() => splitXml(XML, bad)).toThrow('entre 2 y 4')
+  })
+})
+
+describe('corregir errores de Audiveris', () => {
+  const attrs = '<attributes><divisions>6</divisions></attributes>'
+  const note = (type: string, beam = '') => `<note><pitch><step>C</step><octave>4</octave></pitch><duration>6</duration><type>${type}</type>${beam}</note>`
+  const xml = score(`<part id="P1"><measure number="1">${attrs}<forward><duration>4</duration></forward><forward><duration>9</duration></forward>${note('quarter', '<beam number="1">begin</beam>')}${note('eighth', '<beam number="1">end</beam>')}</measure></part>`)
+
+  it('saca huecos que no son figuras y barras en negras', () => {
+    const fixed = doc(cleanXml(xml))
+    // 4/6 de negra no es figura; 9/6 = negra con puntillo, sí.
+    expect([...fixed.querySelectorAll('forward duration')].map((d) => d.textContent)).toEqual(['9'])
+    expect([...fixed.querySelectorAll('note')].map((n) => n.querySelectorAll('beam').length)).toEqual([0, 1])
+  })
+
+  it('deja igual una partitura sana', () => {
+    expect(cleanXml(XML)).toBe(XML)
   })
 })

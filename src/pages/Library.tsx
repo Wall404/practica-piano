@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { odeToJoy } from '../data/odeToJoy'
-import { importAndSave } from '../import/collection'
+import { failedNotice, importAndSave } from '../import/collection'
 import { countMeasures, readXml } from '../import/xmlEdit'
 import type { Collection, Score } from '../model/types'
 import {
@@ -69,6 +69,7 @@ export default function Library({ onOpen, onProgress, onChordTest, onPdf }: Prop
       const saved = await importAndSave(files)
       if (saved.score) return onOpen(saved.score, saved.score.source.kind === 'musicxml' ? files[0] : undefined)
       setAdded(saved.collectionId!)
+      setError(failedNotice(saved.failed))
       await refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo leer la partitura.')
