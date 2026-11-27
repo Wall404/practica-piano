@@ -93,3 +93,38 @@ export function splitXml(xml: string, from: number): [string, string] {
   })
   return [serialize(first), serialize(second)]
 }
+
+const LONG = new Set(['quarter', 'half', 'whole', 'breve', 'long'])
+/** Duración en negras que es una figura dibujable: redonda a fusa, con 0, 1 o 2 puntillos. */
+const isFigure = (quarters: number) =>
+  [8, 4, 2, 1, 1 / 2, 1 / 4, 1 / 8, 1 / 16, 1 / 32].some((base) => [1, 1.5, 1.75].some((dot) => Math.abs(quarters - base * dot) < 1e-6))
+
+/**
+ * Corrige errores típicos de Audiveris que hacen fallar el dibujo (VexFlow): huecos (<forward>) con
+ * duraciones que no son ninguna figura, y barras (<beam>) en negras o figuras más largas.
+ * ponytail: sacar el hueco corre las notas siguientes de esa voz dentro del compás; si molesta, partirlo en figuras.
+ */
+export function cleanXml(xml: string) {
+  const doc = parse(xml)
+  let changed = false
+  for (const part of partsOf(doc)) {
+    let divisions = 1
+    for (const measure of measuresOf(part)) {
+      for (const el of [...measure.children]) {
+        const value = (tag: string) => el.getElementsByTagName(tag)[0]?.textContent?.trim()
+        if (el.tagName === 'attributes' && value('divisions')) divisions = Number(value('divisions'))
+        if (el.tagName === 'forward' && !isFigure(Number(value('duration')) / divisions)) {
+          el.remove()
+          changed = true
+        }
+        if (el.tagName === 'note' && LONG.has(value('type') ?? '')) {
+          for (const beam of [...el.getElementsByTagName('beam')]) {
+            beam.remove()
+            changed = true
+          }
+        }
+      }
+    }
+  }
+  return changed ? serialize(doc) : xml
+}

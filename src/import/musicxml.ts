@@ -1,6 +1,7 @@
 import type { Cursor, OpenSheetMusicDisplay } from 'opensheetmusicdisplay'
 import { PIANO_HIGH, PIANO_LOW } from '../model/notes'
 import type { NoteEvent, Score } from '../model/types'
+import { cleanXml, readXml } from './xmlEdit'
 
 // OSMD numera las alturas una octava más abajo que MIDI.
 const HALF_TONE_TO_MIDI = 12
@@ -14,7 +15,9 @@ export async function loadOsmd(container: HTMLElement, file: Blob): Promise<Open
     drawingParameters: 'compacttight',
     followCursor: true,
   })
-  await osmd.load(file)
+  // Un .mxl es un zip («PK» al principio); se descomprime para poder corregirlo antes de dibujar.
+  const zip = new TextDecoder().decode(await file.slice(0, 2).arrayBuffer()) === 'PK'
+  await osmd.load(cleanXml(await readXml(file, zip ? 'obra.mxl' : 'obra.musicxml')))
   osmd.render()
   return osmd
 }
@@ -93,6 +96,10 @@ export async function fromMusicXml(file: File): Promise<Score> {
     const osmd = await loadOsmd(container, file)
     osmd.enableOrDisableCursors(true)
     return scoreFromOsmd(osmd, file.name)
+  } catch (err) {
+    // VexFlow tira objetos {code, message}, no Error: sin esto la pantalla no dice qué obra falló.
+    const message = err instanceof Error ? err.message : (err as { message?: string })?.message ?? String(err)
+    throw new Error(`${file.name}: ${message}`)
   } finally {
     container.remove()
   }
