@@ -17,7 +17,9 @@ export async function loadOsmd(container: HTMLElement, file: Blob): Promise<Open
   })
   // Un .mxl es un zip («PK» al principio); se descomprime para poder corregirlo antes de dibujar.
   const zip = new TextDecoder().decode(await file.slice(0, 2).arrayBuffer()) === 'PK'
-  await osmd.load(cleanXml(await readXml(file, zip ? 'obra.mxl' : 'obra.musicxml')))
+  const xml = cleanXml(await readXml(file, zip ? 'obra.mxl' : 'obra.musicxml'))
+  // Sin la declaración, OSMD toma el texto como una URL. XMLSerializer (cleanXml, unir/separar) la pierde.
+  await osmd.load(xml.trimStart().startsWith('<?xml') ? xml : `<?xml version="1.0" encoding="UTF-8"?>\n${xml}`)
   osmd.render()
   return osmd
 }
