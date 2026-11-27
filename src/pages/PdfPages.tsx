@@ -92,7 +92,12 @@ export default function PdfPages({ file, onBack }: { file: File; onBack: () => v
       setBusy(false)
       setPageCount(0) // ya están guardadas: sin esto, otro toque las duplicaría
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'La PC no pudo convertir el PDF.')
+      const message = err instanceof Error ? err.message : (err as { message?: string })?.message ?? String(err)
+      setError(
+        err instanceof TypeError && /fetch/i.test(message)
+          ? 'No se pudo hablar con la PC: abrí el ícono «Práctica Piano» y probá de nuevo. Si Chrome pregunta por la red local, tocá Permitir.'
+          : `La PC no pudo convertir el PDF: ${message}`,
+      )
       setBusy(false)
     }
   }
